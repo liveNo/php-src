@@ -173,6 +173,7 @@ static int sapi_lsapi_deactivate(void)
     if ( SG(request_info).path_translated )
     {
         efree( SG(request_info).path_translated );
+        SG(request_info).path_translated = NULL;
     }
 
     return SUCCESS;
@@ -417,7 +418,7 @@ static void sapi_lsapi_log_message(char *message)
 static sapi_module_struct lsapi_sapi_module =
 {
     "litespeed",
-    "LiteSpeed V6.7",
+    "LiteSpeed V6.8",
 
     php_lsapi_startup,              /* startup */
     php_module_shutdown_wrapper,    /* shutdown */
@@ -1003,6 +1004,10 @@ int main( int argc, char * argv[] )
 
 #ifdef ZTS
     tsrm_startup(1, 1, 0, NULL);
+#endif
+
+#ifdef ZEND_SIGNALS
+	zend_signal_startup();
 #endif
 
     if (argc > 1 ) {

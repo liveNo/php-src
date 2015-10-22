@@ -31,8 +31,8 @@
 
 #define ADD_ARENA_SIZE(m)        ZCG(current_persistent_script)->arena_size += ZEND_ALIGNED_SIZE(m)
 
-# define ADD_STRING(str) \
-		ADD_DUP_SIZE((str), _STR_HEADER_SIZE + (str)->len + 1)
+# define ADD_STRING(str) ADD_DUP_SIZE((str), _ZSTR_STRUCT_SIZE(ZSTR_LEN(str)))
+
 # define ADD_INTERNED_STRING(str, do_free) do { \
 		if (!IS_ACCEL_INTERNED(str)) { \
 			zend_string *tmp = accel_new_interned_string(str); \
@@ -54,16 +54,21 @@ static void zend_hash_persist_calc(HashTable *ht, void (*pPersistElement)(zval *
 	uint idx;
 	Bucket *p;
 
-	if (!(ht->u.flags & HASH_FLAG_INITIALIZED)) {
+	if (!(ht->u.flags & HASH_FLAG_INITIALIZED) || ht->nNumUsed == 0) {
 		return;
 	}
 
 	if (!(ht->u.flags & HASH_FLAG_PACKED) && ht->nNumUsed < -(int32_t)ht->nTableMask / 2) {
 		/* compact table */
-		int32_t hash_size = -(int32_t)ht->nTableMask;
+		int32_t hash_size;
 
-		while (hash_size >> 1 > ht->nNumUsed) {
-			hash_size >>= 1;
+		if (ht->nNumUsed <= HT_MIN_SIZE) {
+			hash_size = HT_MIN_SIZE;
+		} else {
+			hash_size = -(int32_t)ht->nTableMask;
+			while (hash_size >> 1 > ht->nNumUsed) {
+				hash_size >>= 1;
+			}
 		}
 		ADD_SIZE(hash_size * sizeof(uint32_t) + ht->nNumUsed * sizeof(Bucket));
 	} else {
@@ -249,6 +254,8 @@ static void zend_persist_op_array_calc_ex(zend_op_array *op_array)
 			ADD_INTERNED_STRING(op_array->vars[i], 0);
 		}
 	}
+
+	ADD_SIZE(ZEND_ALIGNED_SIZE(zend_extensions_op_array_persist_calc(op_array)));
 }
 
 static void zend_persist_op_array_calc(zval *zv)
